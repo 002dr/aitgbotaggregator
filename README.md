@@ -1,125 +1,150 @@
-# AI Bot Aggregator
+# Telegram AI Bot Aggregator
 
-Telegram-бот на aiogram 3.x для агрегации заявок на AI-услуги с многослойной защитой.
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![Aiogram](https://img.shields.io/badge/aiogram-3.2.0-green)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## Структура проекта
+Мультифункциональный Telegram-бот для агрегации AI-услуг с поддержкой оплаты через CryptoBot Testnet и тестовые карты, системой заявок, безопасностью и администрированием.
+
+## Основные возможности
+
+- 📝 Система заявок с фильтрацией и классификацией
+- 💳 Два способа оплаты: CryptoBot Testnet и тестовая карта
+- 🔒 Многоуровневая безопасность: защита от инъекций, PII, токсичности
+- 👨‍💼 Панель администратора с уведомлениями
+- 📤 Отправка проектов и автоматические уведомления
+- 🌐 Поддержка webhook и long polling
+
+## Быстрый старт
+
+### Предварительные требования
+
+- Python 3.12+
+- Git
+- Аккаунт Telegram
+- Токен основного бота от [@BotFather](https://t.me/BotFather)
+- Токен CryptoBot Testnet от [@CryptoTestnetBot](https://t.me/CryptoTestnetBot)
+- Токен админского бота для уведомлений
+
+### Установка
+
+```bash
+# Клонирование репозитория
+git clone https://github.com/002dr/aitgbotaggregator.git
+cd aitgbotaggregator
+
+# Создание виртуального окружения
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# или venv\Scripts\activate  # Windows
+
+# Установка зависимостей
+pip install -r requirements.txt
+```
+
+### Настройка
+
+```bash
+# Скопируйте пример переменных окружения
+cp .env.example .env
+
+# Отредактируйте конфигурацию
+nano .env
+```
+
+Обязательные параметры в `.env`:
+
+```
+BOT_TOKEN=ваш_токен_основного_бота
+ADMIN_IDS=ваш_telegram_id
+CRYPTOBOT_API_TOKEN=токен_от_CryptoTestnetBot
+NOTIFICATION_BOT_TOKEN=токен_бота_для_уведомлений
+PAYMENT_PROVIDER_TOKEN=1744374395:TEST:f2b517d7f08e2ddc397e
+TEST_CARD_PAYMENT_CODE=1744374395:TEST:f2b517d7f08e2ddc397e
+```
+
+### Запуск
+
+```bash
+# Режим long polling (по умолчанию)
+python main.py
+
+# Режим webhook
+export WEBHOOK_URL=https://your-domain.com/webhook
+export WEBHOOK_SECRET=секретный_ключ
+python main.py
+```
+
+## Документация
+
+- [🇷🇺 Подробная документация на русском](#документация-на-русском)
+- [🇬🇧 Detailed English documentation](#english-documentation)
+
+---
+
+## Документация на русском
+
+### Архитектура проекта
 
 ```
 ai_bot_aggregator/
-├── bot/
-│   ├── __init__.py
-│   ├── config.py               # Конфигурация из .env
-│   ├── database.py             # SQLite модели и функции
-│   ├── keyboards.py            # Клавиатуры
-│   ├── services/
-│   │   └── payment_service.py  # CryptoBot + тестовая оплата
-│   ├── security/
-│   │   ├── __init__.py
-│   │   ├── prompt_injection_guard.py  # Защита от prompt injection
-│   │   ├── jailbreak_guard.py         # Защита от jailbreak
-│   │   ├── pii_guard.py              # Маскировка PII
-│   │   ├── toxicity_guard.py          # Модерация токсичности
-│   │   ├── topical_guard.py           # Проверка тематики
-│   │   └── rag_guard.py              # Защита RAG
-│   ├── handlers/
-│   │   ├── __init__.py
-│   │   ├── user_handlers.py   # Пользовательские команды
-│   │   ├── admin_handlers.py  # Админ-панель
-│   │   └── payment_handlers.py # Оплаты
-│   └── utils/
-│       ├── logger.py          # Логирование
-│       └── notifications.py   # Уведомления администратору
-├── data/                      # База данных
-├── logs/                      # Логи
 ├── main.py                    # Точка входа
-├── requirements.txt
-├── .env.example
-└── README.md
+├── bot/
+│   ├── config.py             # Конфигурация
+│   ├── database.py           # Работа с SQLite
+│   ├── keyboards.py          # Клавиатуры
+│   ├── handlers/
+│   │   ├── user_handlers.py   # Обработчики пользователей
+│   │   ├── admin_handlers.py  # Обработчики админов
+│   │   └── payment_handlers.py # Оплата картой
+│   ├── services/
+│   │   └── payment_service.py # CryptoBot + карта
+│   ├── security/             # Защита: инъекции, PII, токсичность
+│   ├── utils/                # Утилиты: логи, уведомления
+│   └── handlers/
+└── requirements.txt
 ```
 
-## Модули безопасности
+### Поток работы
 
-### 1. Prompt Injection Guard (`prompt_injection_guard.py`)
-Фильтрует сообщения по списку regex-триггеров (`ignore previous instructions`, `system prompt`, `override` и т.д.). При обнаружении отклоняет запрос, логирует событие и уведомляет администратора через отдельный бот.
+1. **Заявка**: пользователь нажимает «📝 Оставить заявку» → вводит задачу
+2. **Проверки**: текст проходит через 5 фильтров безопасности
+3. **Оплата**: выбор способа → ввод суммы → создание чека
+4. **Автопроверка**: фоновая задача проверяет статус CryptoBot каждые 10 секунд
+5. **Уведомление**: при успешной оплате бот сам открывает доступ и шлёт уведомление админу
+6. **Проект**: пользователь отправляет результат → админ получает файл
 
-### 2. Jailbreak Guard (`jailbreak_guard.py`)
-Блокирует попытки отключения ограничений по чёрному списку фраз (`no restrictions`, `DAN`, `do anything now`). Уведомляет администратора через отдельный бот.
+### Безопасность
 
-### 3. PII Guard (`pii_guard.py`)
-Маскирует телефоны, email, паспортные данные и адреса regex-паттернами. Заменяет на `[PII REDACTED]`, логирует факт обнаружения и уведомляет администратора.
+- **Prompt Injection Guard**: блокирует попытки взлома через промпты
+- **Jailbreak Guard**: отсеивает инструкции по обходу фильтров
+- **Toxicity Guard**: фильтрует оскорбительный контент
+- **PII Guard**: скрывает персональные данные
+- **Topical Guard**: ограничивает тематику запросов
+- **RAG Poisoning Guard**: защищает базу знаний от заражения
 
-### 4. Toxicity Moderation Guard (`toxicity_guard.py`)
-Проверяет стоп-слова и опционально Perspective API. Отклоняет сообщения с высоким уровнем токсичности и уведомляет администратора.
+### Администрирование
 
-### 5. Topical Guard (`topical_guard.py`)
-Блокирует запросы на запрещённые темы (наркотики, оружие, взлом) и предупреждает о несоответствии белым темам (AI, боты, автоматизация). Уведомляет администратора о подозрительных темах.
+Команды для администраторов:
+- `/start` — открыть панель
+- `📋 Новые заявки` — список ожидающих заявок
+- `📊 Статистика` — метрики системы
+- Кнопки управления статусом заявок
 
-### 6. RAG Poisoning Guard (`rag_guard.py`)
-Валидирует документы на скрытые инструкции и противоречивые данные. Логирует подозрительные документы и уведомляет администратора.
+### Развёртывание
 
-## Установка
+#### Docker (опционально)
 
-```bash
-git clone <repo>
-cd ai_bot_aggregator
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# Отредактируйте .env (указаны все необходимые токены)
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "main.py"]
 ```
 
-## Конфигурация .env
-
-| Переменная | Описание |
-|------------|----------|
-| `BOT_TOKEN` | Токен основного бота для клиентов |
-| `ADMIN_IDS` | ID администраторов (через запятую) |
-| `NOTIFICATION_BOT_TOKEN` | Токен бота для уведомлений администратора |
-| `CRYPTOBOT_API_TOKEN` | Токен CryptoBot (testnet) |
-| `CRYPTOBOT_API_URL` | URL API CryptoBot |
-| `PAYMENT_AMOUNT_USDT` | Сумма оплаты в USDT |
-| `PAYMENT_CURRENCY` | Валюта оплаты |
-| `TEST_CARD_PAYMENT_CODE` | Код тестовой оплаты картой |
-| `PERSPECTIVE_API_KEY` | Ключ Perspective API (опционально) |
-| `WEBHOOK_URL` | URL webhook (опционально) |
-| `WEBHOOK_SECRET` | Секрет webhook (опционально) |
-| `ALLOWED_TOPICS` | Разрешённые темы (через запятую) |
-
-## Запуск
-
-### Polling (для разработки)
-```bash
-python main.py
-```
-
-### Webhook (продакшн)
-```bash
-python main.py
-# Настройте WEBHOOK_URL и WEBHOOK_SECRET в .env
-```
-
-## Деплой на Ubuntu 22.04
-
-```bash
-# 1. Установите зависимости
-sudo apt update && sudo apt install -y python3.10 python3.10-venv python3-pip nginx
-
-# 2. Клонируйте репозиторий
-git clone <repo> /opt/ai_bot_aggregator
-cd /opt/ai_bot_aggregator
-
-# 3. Настройте виртуальное окружение
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# 4. Настройте .env
-nano .env
-
-# 5. Создайте systemd сервис
-sudo nano /etc/systemd/system/ai_bot.service
-```
+#### Systemd сервис
 
 ```ini
 [Unit]
@@ -129,29 +154,97 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/opt/ai_bot_aggregator
-ExecStart=/opt/ai_bot_aggregator/venv/bin/python main.py
+WorkingDirectory=/path/to/ai_bot_aggregator
+ExecStart=/path/to/venv/bin/python main.py
 Restart=always
-Environment="PYTHONUNBUFFERED=1"
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now ai_bot
-journalctl -u ai_bot -f
+## English Documentation
+
+### Project Architecture
+
+```
+ai_bot_aggregator/
+├── main.py                    # Entry point
+├── bot/
+│   ├── config.py             # Configuration
+│   ├── database.py           # SQLite operations
+│   ├── keyboards.py          # Keyboards
+│   ├── handlers/
+│   │   ├── user_handlers.py   # User handlers
+│   │   ├── admin_handlers.py  # Admin handlers
+│   │   └── payment_handlers.py # Card payments
+│   ├── services/
+│   │   └── payment_service.py # CryptoBot + card
+│   ├── security/             # Security guards
+│   └── utils/                # Utilities
+└── requirements.txt
 ```
 
-## Безопасность
+### Workflow
 
-- Все события логируются в `logs/security.log`
-- PII автоматически маскируется
-- Запрещённые темы блокируются или переадресуются оператору
-- Все ключи хранятся в `.env` (никогда не коммитьте!)
-- Рекомендуется использовать HTTPS и VPN для администратора
+1. **Request**: user clicks "📝 Оставить заявку" → enters task
+2. **Validation**: text passes through 5 security filters
+3. **Payment**: method selection → amount input → invoice creation
+4. **Auto-check**: background task checks CryptoBot status every 10 seconds
+5. **Notification**: bot automatically grants access and notifies admin
+6. **Project**: user submits result → admin receives file
 
-## Лицензия
+### Security Features
+
+- **Prompt Injection Guard**: blocks prompt-based attacks
+- **Jailbreak Guard**: filters jailbreak instructions
+- **Toxicity Guard**: filters offensive content
+- **PII Guard**: redacts personal information
+- **Topical Guard**: restricts query topics
+- **RAG Poisoning Guard**: protects knowledge base
+
+### Administration
+
+Admin commands:
+- `/start` — open admin panel
+- `📋 Новые заявки` — pending requests list
+- `📊 Статистика` — system metrics
+- Request status management buttons
+
+### Deployment
+
+#### Docker (optional)
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "main.py"]
+```
+
+#### Systemd service
+
+```ini
+[Unit]
+Description=AI Bot Aggregator
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/path/to/ai_bot_aggregator
+ExecStart=/path/to/venv/bin/python main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Лицензия / License
 
 MIT
+
+## Support
+
+По вопросам / For questions: @David_Zhe
