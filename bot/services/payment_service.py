@@ -1,13 +1,14 @@
+import uuid
 import logging
 from aiocryptopay import AioCryptoPay, Networks
 from aiocryptopay.models.update import Invoice
 from bot.config import CRYPTOBOT_API_TOKEN, PAYMENT_AMOUNT_USDT
-from bot.database import create_payment
+from bot.database import create_payment, update_payment_status, get_user, set_user_paid, log_security_event
 from bot.utils.payment_state import add_active_invoice, remove_active_invoice
 
 logger = logging.getLogger(__name__)
 
-crypto = AioCryptoPay(token=CRYPTOBOT_API_TOKEN, network=Networks.MAIN_NET)
+crypto = AioCryptoPay(token=CRYPTOBOT_API_TOKEN, network=Networks.TEST_NET)
 
 
 async def create_cryptobot_payment(user_id: int, amount: float | None = None) -> dict:
@@ -45,3 +46,15 @@ async def check_cryptobot_payment(invoice_id: int) -> bool:
     except Exception as e:
         logger.error(f"Ошибка проверки оплаты CryptoBot: {e}")
         return False
+
+
+async def simulate_card_payment(user_id: int, code: str | None = None, amount: float | None = None) -> dict:
+    payment_code = code or f"TEST_{uuid.uuid4().hex[:12]}"
+    payment_amount = amount if amount is not None else PAYMENT_AMOUNT_USDT
+    create_payment(user_id, payment_amount, "USDT", payment_code)
+    user = get_user(user_id)
+    if user and not user.get("is_paid"):
+        set_user_paid(user_id)
+    update_payment_status(payment_code, "paid")
+    log_security_event(user_id, "test_payment", f"Test payment completed: {payment_code}")
+    return {"ok": True, "payment_id": payment_code, "message": f"Тестовая оплата прошла успешно! Доступ открыт. {payment_amount} USDT"}

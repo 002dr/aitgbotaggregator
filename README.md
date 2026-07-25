@@ -4,12 +4,12 @@
 ![Aiogram](https://img.shields.io/badge/aiogram-3.2.0-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-Мультифункциональный Telegram-бот для агрегации AI-услуг с поддержкой оплаты через CryptoBot, системой заявок, безопасностью и администрированием.
+Мультифункциональный Telegram-бот для агрегации AI-услуг с поддержкой оплаты через CryptoBot Testnet и тестовые карты, системой заявок, безопасностью и администрированием.
 
 ## Основные возможности
 
 - 📝 Система заявок с фильтрацией и классификацией
-- 💳 Оплата через CryptoBot
+- 💳 Два способа оплаты: CryptoBot Testnet и тестовая карта
 - 🔒 Многоуровневая безопасность: защита от инъекций, PII, токсичности
 - 👨‍💼 Панель администратора с уведомлениями
 - 📤 Отправка проектов и автоматические уведомления
@@ -23,7 +23,7 @@
 - Git
 - Аккаунт Telegram
 - Токен основного бота от [@BotFather](https://t.me/BotFather)
-- Токен CryptoBot от [@CryptoBot](https://t.me/CryptoBot)
+- Токен CryptoBot Testnet от [@CryptoTestnetBot](https://t.me/CryptoTestnetBot)
 - Токен админского бота для уведомлений
 
 ### Установка
@@ -57,8 +57,10 @@ nano .env
 ```
 BOT_TOKEN=ваш_токен_основного_бота
 ADMIN_IDS=ваш_telegram_id
-CRYPTOBOT_API_TOKEN=токен_от_CryptoBot
+CRYPTOBOT_API_TOKEN=токен_от_CryptoTestnetBot
 NOTIFICATION_BOT_TOKEN=токен_бота_для_уведомлений
+PAYMENT_PROVIDER_TOKEN=1744374395:TEST:f2b517d7f08e2ddc397e
+TEST_CARD_PAYMENT_CODE=1744374395:TEST:f2b517d7f08e2ddc397e
 ```
 
 ### Запуск
@@ -93,9 +95,10 @@ ai_bot_aggregator/
 │   ├── keyboards.py          # Клавиатуры
 │   ├── handlers/
 │   │   ├── user_handlers.py   # Обработчики пользователей
-│   │   └── admin_handlers.py  # Обработчики админов
+│   │   ├── admin_handlers.py  # Обработчики админов
+│   │   └── payment_handlers.py # Оплата картой
 │   ├── services/
-│   │   └── payment_service.py # CryptoBot оплата
+│   │   └── payment_service.py # CryptoBot + карта
 │   ├── security/             # Защита: инъекции, PII, токсичность
 │   ├── utils/                # Утилиты: логи, уведомления
 │   └── handlers/
@@ -106,8 +109,8 @@ ai_bot_aggregator/
 
 1. **Заявка**: пользователь нажимает «📝 Оставить заявку» → вводит задачу
 2. **Проверки**: текст проходит через 5 фильтров безопасности
-3. **Оплата**: выбор способа → ввод суммы → создание чека через CryptoBot
-4. **Автопроверка**: фоновая задача проверяет статус оплаты каждые 10 секунд
+3. **Оплата**: выбор способа → ввод суммы → создание чека
+4. **Автопроверка**: фоновая задача проверяет статус CryptoBot каждые 10 секунд
 5. **Уведомление**: при успешной оплате бот сам открывает доступ и шлёт уведомление админу
 6. **Проект**: пользователь отправляет результат → админ получает файл
 
@@ -172,9 +175,10 @@ ai_bot_aggregator/
 │   ├── keyboards.py          # Keyboards
 │   ├── handlers/
 │   │   ├── user_handlers.py   # User handlers
-│   │   └── admin_handlers.py  # Admin handlers
+│   │   ├── admin_handlers.py  # Admin handlers
+│   │   └── payment_handlers.py # Card payments
 │   ├── services/
-│   │   └── payment_service.py # CryptoBot payments
+│   │   └── payment_service.py # CryptoBot + card
 │   ├── security/             # Security guards
 │   └── utils/                # Utilities
 └── requirements.txt
@@ -184,7 +188,7 @@ ai_bot_aggregator/
 
 1. **Request**: user clicks "📝 Оставить заявку" → enters task
 2. **Validation**: text passes through 5 security filters
-3. **Payment**: method selection → amount input → invoice creation via CryptoBot
+3. **Payment**: method selection → amount input → invoice creation
 4. **Auto-check**: background task checks CryptoBot status every 10 seconds
 5. **Notification**: bot automatically grants access and notifies admin
 6. **Project**: user submits result → admin receives file

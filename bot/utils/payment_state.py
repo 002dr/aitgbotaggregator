@@ -1,3 +1,4 @@
+_invoice_payloads: dict[str, dict] = {}
 _active_invoices: dict[int, dict] = {}
 
 

@@ -7,6 +7,7 @@ from bot.config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET, ADMIN_IDS, NOTIFI
 from bot.database import init_db
 from bot.handlers.user_handlers import user_router
 from bot.handlers.admin_handlers import admin_router
+from bot.handlers.payment_handlers import payment_router
 from bot.keyboards import get_main_keyboard
 from bot.utils.notifications import get_notification_bot, send_admin_notification
 from bot.services.payment_service import check_cryptobot_payment
@@ -21,7 +22,7 @@ async def main():
         get_notification_bot()
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
-    dp.include_routers(user_router, admin_router)
+    dp.include_routers(user_router, admin_router, payment_router)
 
     if WEBHOOK_URL:
         await bot.set_webhook(WEBHOOK_URL, secret_token=WEBHOOK_SECRET)

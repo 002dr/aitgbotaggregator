@@ -4,7 +4,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 def get_main_keyboard(is_admin: bool = False, is_paid: bool = False) -> ReplyKeyboardMarkup:
     buttons = [
         [KeyboardButton(text="📝 Оставить заявку")],
-        [KeyboardButton(text="💳 Оплатить"), KeyboardButton(text="ℹ️ Помощь")],
+        [KeyboardButton(text="💳 Проверить оплату"), KeyboardButton(text="ℹ️ Помощь")],
     ]
     if is_paid:
         buttons.append([KeyboardButton(text="📤 Отправить проект")])
@@ -26,6 +26,7 @@ def get_admin_keyboard() -> ReplyKeyboardMarkup:
 def get_payment_keyboard(payment_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 Оплатить USDT (CryptoBot)", url=payment_url)],
+        [InlineKeyboardButton(text="🧪 Тестовая оплата картой", callback_data="test_payment")],
     ])
 
 
@@ -36,7 +37,8 @@ def get_amount_keyboard(step: str = "amount") -> ReplyKeyboardMarkup:
 
 def get_payment_method_keyboard() -> ReplyKeyboardMarkup:
     buttons = [
-        [KeyboardButton(text="🪙 CryptoBot")],
+        [KeyboardButton(text="🪙 CryptoBot Testnet")],
+        [KeyboardButton(text="💳 Карта")],
         [KeyboardButton(text="🔙 Назад")],
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
