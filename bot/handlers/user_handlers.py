@@ -4,11 +4,10 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
-from aiogram.types import Message, LabeledPrice, PreCheckoutQuery, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.exceptions import TelegramBadRequest
-from bot.config import ADMIN_IDS, PAYMENT_PROVIDER_TOKEN, CRYPTOBOT_API_TOKEN, PAYMENT_CURRENCY, PAYMENT_AMOUNT_USDT, TEST_CARD_PAYMENT_CODE
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from bot.config import ADMIN_IDS, CRYPTOBOT_API_TOKEN, PAYMENT_AMOUNT_USDT
 from bot.database import get_user, upsert_user, create_request, set_user_paid, log_security_event
-from bot.keyboards import get_main_keyboard, get_amount_keyboard, get_payment_method_keyboard, get_payment_keyboard
+from bot.keyboards import get_main_keyboard, get_amount_keyboard, get_payment_method_keyboard
 from bot.security.prompt_injection_guard import PromptInjectionGuard
 from bot.security.jailbreak_guard import JailbreakGuard
 from bot.security.pii_guard import PIIGuard
@@ -16,8 +15,7 @@ from bot.security.toxicity_guard import ToxicityGuard
 from bot.security.topical_guard import TopicalGuard
 from bot.security.rag_guard import RAGPoisoningGuard
 from bot.utils.notifications import send_admin_notification
-from bot.services.payment_service import create_cryptobot_payment, check_cryptobot_payment, simulate_card_payment, crypto
-from bot.utils.payment_state import _invoice_payloads
+from bot.services.payment_service import create_cryptobot_payment
 
 
 user_router = Router()
@@ -189,20 +187,11 @@ async def process_payment_method(message: Message, state: FSMContext):
     if text == "ℹ️ Помощь":
         await cmd_help(message)
         return
-    if text == "🪙 CryptoBot Testnet":
+    if text == "🪙 CryptoBot":
         await state.update_data(payment_method="cryptobot")
         await state.set_state(PaymentStates.waiting_amount)
         await message.answer(
-            "🪙 <b>CryptoBot Testnet</b>\n\nВведите сумму оплаты (USDT). Например: 10 или 25.50",
-            reply_markup=get_amount_keyboard(),
-            parse_mode=ParseMode.HTML,
-        )
-        return
-    if text == "💳 Карта":
-        await state.update_data(payment_method="card")
-        await state.set_state(PaymentStates.waiting_amount)
-        await message.answer(
-            "💳 <b>Оплата картой</b>\n\nВведите сумму оплаты. Например: 10 или 25.50",
+            "🪙 <b>CryptoBot</b>\n\nВведите сумму оплаты (USDT). Например: 10 или 25.50",
             reply_markup=get_amount_keyboard(),
             parse_mode=ParseMode.HTML,
         )
@@ -219,13 +208,12 @@ async def process_amount(message: Message, state: FSMContext):
     text = (message.text or "").strip()
     user_id = message.from_user.id
     data = await state.get_data()
-    method = data.get("payment_method")
     request_text = data.get("request_text", "")
 
     if text == "ℹ️ Помощь":
         await cmd_help(message)
         return
-    if text in ["🔙 Назад", "📝 Оставить заявку", "💳 Проверить оплату"]:
+    if text in ["🔙 Назад", "📝 Оставить заявку", "💳 Оплатить"]:
         await state.clear()
         await message.answer("Отменено.", reply_markup=get_main_keyboard(), parse_mode=ParseMode.HTML)
         return
@@ -240,39 +228,8 @@ async def process_amount(message: Message, state: FSMContext):
 
     await state.update_data(request_amount=amount)
 
-    if method == "card":
-        payload = f"card_{user_id}_{message.message_id}"
-        price_amount = int(round(amount * 100))
-        _invoice_payloads[payload] = {
-            "user_id": user_id,
-            "amount": amount,
-            "currency": "RUB",
-            "payload": payload,
-            "request_text": request_text,
-            "method": "card",
-        }
-        try:
-            await message.answer_invoice(
-                title="Оплата за AI-услуги",
-                description=f"Сумма к оплате: {amount} RUB",
-                payload=payload,
-                provider_token=PAYMENT_PROVIDER_TOKEN,
-                currency="RUB",
-                prices=[LabeledPrice(label=f"Оплата {amount} RUB", amount=price_amount)],
-                need_name=False,
-                need_phone_number=False,
-                need_email=False,
-                need_shipping_address=False,
-                is_flexible=False,
-            )
-        except TelegramBadRequest as e:
-            await message.answer(f"❌ Не удалось создать платёж: {e.message}", reply_markup=get_main_keyboard(), parse_mode=ParseMode.HTML)
-        await state.clear()
-        return
-
     result = await create_cryptobot_payment(user_id, amount=amount)
     if result.get("ok"):
-        await state.update_data(cryptobot_invoice_id=result["payment_id"])
         invoice_id = result["payment_id"]
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["url"])],
@@ -289,9 +246,6 @@ async def process_amount(message: Message, state: FSMContext):
             parse_mode=ParseMode.HTML,
         )
     await state.clear()
-
-
-@user_router.message(F.text == "📤 Отправить проект", StateFilter(None))
 async def cmd_send_project(message: Message, state: FSMContext):
     user = get_user(message.from_user.id)
     if not user or not user.get("is_paid"):
@@ -328,7 +282,7 @@ async def process_project(message: Message, state: FSMContext):
     await message.answer("✅ Проект отправлен фрилансеру. Оператор свяжется с вами.", reply_markup=get_main_keyboard(), parse_mode=ParseMode.HTML)
 
 
-@user_router.message(F.text == "💳 Проверить оплату", StateFilter(None))
+@user_router.message(F.text == "💳 Оплатить", StateFilter(None))
 async def cmd_payment(message: Message, state: FSMContext):
     user = get_user(message.from_user.id)
     if user and user.get("is_paid"):
